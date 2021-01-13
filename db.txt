@@ -1,0 +1,3 @@
+code rust	true
+make coffee	true
+learn rust	true
