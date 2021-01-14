@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::io::Read;
-use std::str::FromStr;
 
 struct Todo {
     map: HashMap<String, bool>,
@@ -11,34 +9,36 @@ impl Todo {
         self.map.insert(key, true);
     }
 
-    fn save(self) -> Result<(), std::io::Error> {
-        let mut content = String::new();
-        for (key, value) in self.map {
-            //separate key and value with a tab character and each line with a new line.
-            let record = format!("{}\t{}\n", key, value);
-            content.push_str(&record)
-        }
-        std::fs::write("db.txt", content)
+    fn save(self) -> Result<(), Box<dyn std::error::Error>> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open("db.json")?;
+        serde_json::to_writer_pretty(file, &self.map)?;
+        Ok(())
     }
 
     fn new() -> Result<Todo, std::io::Error> {
-        let mut file = std::fs::OpenOptions::new()
+        let file = std::fs::OpenOptions::new()
             .write(true)
             .create(true) // create file if not already present
             .read(true)
-            .open("db.txt")?;
+            .open("db.json")?;
+        // deserialize the file and conver to HashMap
+        match serde_json::from_reader(file) {
+            Ok(map) => Ok(Todo { map }),
+            Err(e) if e.is_eof() => Ok(Todo {
+                map: HashMap::new(),
+            }),
+            Err(e) => panic!("An error occurred: {}", e),
+        }
+    }
 
-        let mut content = String::new();
-        //reads all the bytes in the file and appends them into the content String
-        file.read_to_string(&mut content)?;
-
-        let map: HashMap<String, bool> = content
-            .lines()
-            .map(|line| line.splitn(2, '\t').collect::<Vec<&str>>()) // Split lines on tab character
-            .map(|v| (v[0], v[1])) // map into tuple
-            .map(|(k, v)| (String::from(k), bool::from_str(v).unwrap()))
-            .collect();
-        Ok(Todo { map })
+    fn complete(&mut self, key: &String) -> Option<()> {
+        match self.map.get_mut(key) {
+            Some(value) => Some(*value = false),
+            None => None,
+        }
     }
 }
 
@@ -54,6 +54,14 @@ fn main() {
         match todo.save() {
             Ok(_) => println!("todo saved"),
             Err(why) => println!("An error occurred: {}", why),
+        }
+    } else if action == "complete" {
+        match todo.complete(&item) {
+            None => println!("'{}' is not present in this list", item),
+            Some(_) => match todo.save() {
+                Ok(_) => println!("todo saved"),
+                Err(why) => println!("An error occurred: {}", why),
+            },
         }
     }
 }

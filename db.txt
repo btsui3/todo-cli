@@ -1,3 +1,3 @@
-code rust	true
-make coffee	true
-learn rust	true
+code rust	false
+apply to descartes labs	true
+code go	true
